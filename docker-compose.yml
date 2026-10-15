@@ -1,0 +1,167 @@
+version: '3.9'
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: ecommerce-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: app
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.runCommand({ ping: 1 }).ok\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ecommerce-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ecommerce-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  gateway:
+    build:
+      context: ./gateway
+    container_name: ecommerce-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      SERVICE_NAME: gateway
+      NODE_ENV: development
+    depends_on:
+      user-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+      order-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+
+  user-service:
+    build:
+      context: ./services/user-service
+    container_name: ecommerce-user-service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      SERVICE_NAME: user-service
+      MONGO_URI: mongodb://mongo:27017/app
+      NODE_ENV: development
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  product-service:
+    build:
+      context: ./services/product-service
+    container_name: ecommerce-product-service
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+      SERVICE_NAME: product-service
+      MONGO_URI: mongodb://mongo:27017/app
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: development
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  order-service:
+    build:
+      context: ./services/order-service
+    container_name: ecommerce-order-service
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      PORT: 3003
+      SERVICE_NAME: order-service
+      POSTGRES_URL: postgresql://postgres:postgres@postgres:5432/app
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+    container_name: ecommerce-notification-service
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    environment:
+      PORT: 3004
+      SERVICE_NAME: notification-service
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      NODE_ENV: development
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  mongo-data:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:

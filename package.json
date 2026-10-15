@@ -1,0 +1,25 @@
+{
+  "name": "ecommerce-platform",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "gateway",
+    "services/*"
+  ],
+  "scripts": {
+    "dev": "docker compose up --build",
+    "down": "docker compose down -v",
+    "test": "npm --workspaces --if-present test"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
