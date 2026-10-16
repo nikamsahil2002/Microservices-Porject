@@ -9,10 +9,14 @@
     "test": "node --test tests/**/*.test.js 2>/dev/null || true"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "jsonwebtoken": "^9.0.2"
+    "express-validator": "^7.3.2",
+    "http-status": "^2.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^9.11.2"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.5"

@@ -1,4 +1,4 @@
-import { RequestHandler } from 'express';
+import {RequestHandler} from 'express';
 
 export function errorWrapper(handler: RequestHandler): RequestHandler {
   return (req, res, next) => {

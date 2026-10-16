@@ -16,7 +16,7 @@ export function getHealthData(serviceName: string): HealthResponse {
     service: serviceName,
     uptime: process.uptime(),
     dependencies: {
-      postgres: process.env.POSTGRES_URL ? 'configured' : 'missing',
+      postgres: process.env.DB_DATABASE || process.env.POSTGRES_URL ? 'configured' : 'missing',
       rabbitmq: process.env.RABBITMQ_URL ? 'configured' : 'missing',
     },
   };

@@ -15,7 +15,7 @@ export function getHealthData(serviceName: string): HealthResponse {
     service: serviceName,
     uptime: process.uptime(),
     dependencies: {
-      mongo: process.env.MONGO_URI ? 'configured' : 'missing',
+      mongo: process.env.USER_MONGO_URI || process.env.MONGO_URI ? 'configured' : 'missing',
     },
   };
 }

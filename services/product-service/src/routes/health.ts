@@ -1,6 +1,6 @@
-import { Router } from 'express';
-import { getHealth } from '../controllers/healthController';
-import { errorWrapper } from '../middleware/errorWrapper';
+import {Router} from 'express';
+import {getHealth} from '../controllers/healthController';
+import {errorWrapper} from '../middleware/errorWrapper';
 
 const router = Router();
 

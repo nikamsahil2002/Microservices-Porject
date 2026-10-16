@@ -1,4 +1,4 @@
-import express, { Express, Request, Response } from 'express';
+import express, {Express, Request, Response} from 'express';
 import cors from 'cors';
 
 type GatewayDependencyMap = {
@@ -19,7 +19,7 @@ export function createApp(): Express {
   const app = express();
 
   app.set('trust proxy', 1);
-  app.use(cors({ origin: true, credentials: true }));
+  app.use(cors({origin: true, credentials: true}));
   app.use(express.json());
 
   app.get('/health', (_req: Request, res: Response<GatewayHealthResponse>) => {

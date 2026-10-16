@@ -1,7 +1,17 @@
-import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import crypto, {randomUUID} from 'crypto';
 import jwt from 'jsonwebtoken';
-import { AppError } from '../utils/AppError';
-import { AuthUser } from '../middleware/auth';
+import {
+  BadRequestError,
+  CustomError,
+  DataFoundError,
+  InternalServerError,
+  UnauthorizedError,
+} from '../utils/customError';
+import {AuthUser} from '../middleware/auth';
+import {config} from '../config';
+import {RefreshTokenModel} from '../models/refreshTokenModel';
+import {UserModel} from '../models/userModel';
 
 export interface RegisterUserInput {
   name: string;
@@ -14,6 +24,11 @@ export interface LoginUserInput {
   password: string;
 }
 
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
 export interface PublicUser {
   id: string;
   name: string;
@@ -21,89 +36,169 @@ export interface PublicUser {
   createdAt: string;
 }
 
-interface UserRecord extends PublicUser {
-  passwordHash: string;
+const accessTokenLifetime = 15 * 60 * 1000;
+const refreshTokenLifetime = 7 * 24 * 60 * 60 * 1000;
+
+function toPublicUser(user: {
+  _id: {toString(): string};
+  name: string;
+  email: string;
+  createdAt: Date;
+}): PublicUser {
+  return {
+    id: user._id.toString(),
+    name: user.name,
+    email: user.email,
+    createdAt: user.createdAt.toISOString(),
+  };
 }
 
-const users: UserRecord[] = [];
-const jwtSecret = process.env.JWT_SECRET ?? 'microservice-dev-secret';
-
-function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex');
+function hashRefreshToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-function sanitizeUser(user: UserRecord): PublicUser {
-  const { passwordHash: _passwordHash, ...publicUser } = user;
-  return publicUser;
+async function createTokenPair(user: PublicUser): Promise<AuthTokens> {
+  const identity = {id: user.id, email: user.email, name: user.name};
+  const accessToken = jwt.sign({...identity, tokenType: 'access'}, config.jwtSecret, {
+    expiresIn: '15m',
+  });
+  const refreshToken = jwt.sign({...identity, tokenType: 'refresh'}, config.refreshTokenSecret, {
+    expiresIn: '7d',
+    jwtid: randomUUID(),
+  });
+
+  await RefreshTokenModel.create({
+    userId: user.id,
+    tokenHash: hashRefreshToken(refreshToken),
+    expiresAt: new Date(Date.now() + refreshTokenLifetime),
+  });
+
+  return {accessToken, refreshToken};
 }
 
-export function generateToken(user: Pick<AuthUser, 'id' | 'email' | 'name'>): string {
-  return jwt.sign(user, jwtSecret, { expiresIn: '1h' });
-}
-
-export function registerUser(input: RegisterUserInput): { user: PublicUser; token: string } {
+export async function registerUser(
+  input: RegisterUserInput,
+): Promise<{user: PublicUser} & AuthTokens> {
   const name = input.name?.trim();
   const email = input.email?.trim().toLowerCase();
   const password = input.password?.trim();
 
-  if (!name || !email || !password) {
-    throw new AppError(400, 'Name, email and password are required');
+  const existingUser = await UserModel.findOne({email});
+  if (existingUser) {
+    throw new DataFoundError('User with this email already exists');
   }
 
-  if (password.length < 6) {
-    throw new AppError(400, 'Password must be at least 6 characters long');
-  }
-
-  const alreadyExists = users.some((user) => user.email === email);
-  if (alreadyExists) {
-    throw new AppError(409, 'User with this email already exists');
-  }
-
-  const newUser: UserRecord = {
-    id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  const userPayload = {
     name,
     email,
-    passwordHash: hashPassword(password),
-    createdAt: new Date().toISOString(),
+    passwordHash: await bcrypt.hash(password, 12),
   };
 
-  users.push(newUser);
+  const newUser = await UserModel.create(userPayload);
+  if (!newUser) {
+    throw new InternalServerError('Unable to create user');
+  }
+
+  const user = toPublicUser(newUser);
+  const tokens = await createTokenPair(user);
 
   return {
-    user: sanitizeUser(newUser),
-    token: generateToken({ id: newUser.id, email: newUser.email, name: newUser.name }),
+    user,
+    ...tokens,
   };
 }
 
-export function loginUser(input: LoginUserInput): { user: PublicUser; token: string } {
+export async function loginUser(input: LoginUserInput): Promise<{user: PublicUser} & AuthTokens> {
   const email = input.email?.trim().toLowerCase();
   const password = input.password?.trim();
 
   if (!email || !password) {
-    throw new AppError(400, 'Email and password are required');
+    throw new BadRequestError('Email and password are required');
   }
 
-  const user = users.find((candidate) => candidate.email === email);
-  if (!user || user.passwordHash !== hashPassword(password)) {
-    throw new AppError(401, 'Invalid email or password');
+  const userRecord = await UserModel.findOne({email});
+  if (!userRecord || !(await bcrypt.compare(password, userRecord.passwordHash))) {
+    throw new UnauthorizedError('Invalid email or password');
   }
 
+  const user = toPublicUser(userRecord);
   return {
-    user: sanitizeUser(user),
-    token: generateToken({ id: user.id, email: user.email, name: user.name }),
+    user,
+    ...(await createTokenPair(user)),
   };
 }
 
-export function getUserById(id: string): PublicUser | undefined {
-  const user = users.find((candidate) => candidate.id === id);
-  return user ? sanitizeUser(user) : undefined;
+interface RefreshTokenPayload extends AuthUser {
+  tokenType: 'refresh';
 }
 
-export function getCurrentUser(user: AuthUser): PublicUser {
-  const currentUser = getUserById(user.id);
+function verifyRefreshToken(token: string): RefreshTokenPayload {
+  try {
+    const payload = jwt.verify(token, config.refreshTokenSecret) as RefreshTokenPayload;
+    if (payload.tokenType !== 'refresh') {
+      throw new Error('Wrong token type');
+    }
+    return payload;
+  } catch {
+    throw new UnauthorizedError('Invalid or expired refresh token');
+  }
+}
+
+export async function refreshAuthTokens(refreshToken: string | undefined): Promise<AuthTokens> {
+  if (!refreshToken) {
+    throw new BadRequestError('Refresh token is required');
+  }
+
+  const payload = verifyRefreshToken(refreshToken);
+  const session = await RefreshTokenModel.findOneAndUpdate(
+    {
+      userId: payload.id,
+      tokenHash: hashRefreshToken(refreshToken),
+      revokedAt: null,
+      expiresAt: {$gt: new Date()},
+    },
+    {revokedAt: new Date()},
+    {new: false},
+  );
+
+  if (!session) {
+    throw new UnauthorizedError('Refresh token has been revoked or already used');
+  }
+
+  const userRecord = await UserModel.findById(payload.id);
+  if (!userRecord) {
+    throw new UnauthorizedError('User for this refresh token no longer exists');
+  }
+
+  return createTokenPair(toPublicUser(userRecord));
+}
+
+export async function revokeRefreshToken(refreshToken: string | undefined): Promise<void> {
+  if (!refreshToken) {
+    throw new BadRequestError('Refresh token is required');
+  }
+
+  const payload = verifyRefreshToken(refreshToken);
+  await RefreshTokenModel.updateOne(
+    {
+      userId: payload.id,
+      tokenHash: hashRefreshToken(refreshToken),
+      revokedAt: null,
+    },
+    {revokedAt: new Date()},
+  );
+}
+
+export async function getUserById(id: string): Promise<PublicUser | undefined> {
+  const userRecord = await UserModel.findById(id);
+  return userRecord ? toPublicUser(userRecord) : undefined;
+}
+
+export async function getCurrentUser(user: AuthUser): Promise<PublicUser> {
+  const currentUser = await getUserById(user.id);
 
   if (!currentUser) {
-    throw new AppError(404, 'User not found');
+    throw new CustomError('User not found', 404);
   }
 
   return currentUser;
