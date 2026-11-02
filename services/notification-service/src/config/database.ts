@@ -3,7 +3,7 @@ import {config} from './index';
 
 export const database = new Pool({connectionString: config.postgresUrl});
 
-export async function connectDatabase(): Promise<void> {
+async function ensureDatabaseExists(): Promise<void> {
   const adminUrl = new URL(config.postgresUrl);
   adminUrl.pathname = '/postgres';
   const adminDatabase = new Pool({connectionString: adminUrl.toString()});
@@ -20,6 +20,18 @@ export async function connectDatabase(): Promise<void> {
   } finally {
     await adminDatabase.end();
   }
+}
 
-  await database.query('SELECT 1');
+export async function connectDatabase(): Promise<void> {
+  try {
+    await ensureDatabaseExists();
+    await database.query('SELECT 1');
+    console.log('PostgreSQL connected');
+  } catch (error) {
+    console.error(
+      `Error While Connecting Database\n${error}\nRetry Database Connection after 5000ms\n`,
+    );
+    await new Promise<void>((resolve) => setTimeout(resolve, 5000));
+    return connectDatabase();
+  }
 }
