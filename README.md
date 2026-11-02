@@ -39,6 +39,18 @@ Each service connects to its own database before listening for requests. MongoDB
 
 The user service hashes passwords with bcrypt and returns a 15-minute access token plus a 7-day refresh token from registration and login. Send the access token as `Authorization: Bearer <accessToken>`. Refresh tokens are stored as hashes in MongoDB and rotated by `POST /api/users/refresh` with `{ "refreshToken": "..." }`. `POST /api/users/logout` revokes the submitted refresh token. Set distinct `JWT_SECRET` and `JWT_REFRESH_SECRET` values outside development.
 
+## Product API
+
+The product service exposes CRUD endpoints under `/api/products`:
+
+- `POST /api/products` creates a product. Required fields: `name`, `sku`, and `price`.
+- `GET /api/products?page=1&limit=10` lists products with pagination (page defaults to `1`, limit defaults to `10`, maximum limit is `100`).
+- `GET /api/products/:id` retrieves a product by MongoDB ID.
+- `PUT /api/products/:id` updates a product. Required fields: `name`, `sku`, and `price`.
+- `DELETE /api/products/:id` deletes a product.
+
+Products can also include `description`, `stock`, and `active`.
+
 ## Notes
 
 This is the starting point for the assignment. Each phase will add the business logic and tests in sequence.
