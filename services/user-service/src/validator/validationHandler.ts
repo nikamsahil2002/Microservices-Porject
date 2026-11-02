@@ -5,6 +5,7 @@ const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$
 
 export const registerUserValidator = [
   body('name')
+    .trim()
     .notEmpty()
     .withMessage('Name is required')
     .isString()
@@ -13,12 +14,14 @@ export const registerUserValidator = [
     .withMessage('Name must be between 1 to 255 characters'),
 
   body('email')
+    .trim()
     .notEmpty()
     .withMessage('Email is required')
     .isEmail()
     .withMessage('Please provide a valid email'),
 
   body('password')
+    .trim()
     .notEmpty()
     .withMessage('Password is required')
     .matches(passwordRegex)

@@ -3,20 +3,24 @@ import {body, validationResult} from 'express-validator';
 
 export const createProductValidator = [
   body('name')
+    .trim()
     .notEmpty()
     .withMessage('Product name is required')
     .isString()
     .withMessage('Product name must be a string')
-    .trim()
     .isLength({min: 1, max: 255})
     .withMessage('Product name must be between 1 and 255 characters'),
-  body('description').optional().isString().withMessage('Product description must be a string'),
+  body('description')
+    .optional()
+    .isString()
+    .withMessage('Product description must be a string')
+    .trim(),
   body('sku')
+    .trim()
     .notEmpty()
     .withMessage('SKU is required')
     .isString()
     .withMessage('SKU must be a string')
-    .trim()
     .isLength({min: 1, max: 100})
     .withMessage('SKU must be between 1 and 100 characters'),
   body('price')

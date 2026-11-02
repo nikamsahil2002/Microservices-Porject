@@ -3,6 +3,7 @@ import {body, validationResult} from 'express-validator';
 
 export const createOrderValidator = [
   body('userId')
+    .trim()
     .notEmpty()
     .withMessage('User ID is required')
     .isString()
@@ -10,6 +11,7 @@ export const createOrderValidator = [
     .isLength({max: 100})
     .withMessage('User ID must not exceed 100 characters'),
   body('productId')
+    .trim()
     .notEmpty()
     .withMessage('Product ID is required')
     .isString()

@@ -79,19 +79,17 @@ async function createTokenPair(user: PublicUser): Promise<AuthTokens> {
 export async function registerUser(
   input: RegisterUserInput,
 ): Promise<{user: PublicUser} & AuthTokens> {
-  const name = input.name?.trim();
-  const email = input.email?.trim().toLowerCase();
-  const password = input.password?.trim();
+  const { email, name, password } = input;
 
   const existingUser = await UserModel.findOne({email});
   if (existingUser) {
-    throw new DataFoundError('User with this email already exists');
+    throw new DataFoundError(`User with email ${email} already exists`);
   }
 
   const userPayload = {
     name,
     email,
-    passwordHash: await bcrypt.hash(password, 12),
+    passwordHash: password,
   };
 
   const newUser = await UserModel.create(userPayload);
@@ -100,11 +98,12 @@ export async function registerUser(
   }
 
   const user = toPublicUser(newUser);
-  const tokens = await createTokenPair(user);
+  const {accessToken, refreshToken} = await createTokenPair(user);
 
   return {
     user,
-    ...tokens,
+    accessToken,
+    refreshToken,
   };
 }
 
