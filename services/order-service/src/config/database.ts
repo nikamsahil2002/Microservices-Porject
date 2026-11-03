@@ -1,7 +1,11 @@
 import {Pool} from 'pg';
+import {Sequelize} from 'sequelize';
 import {config} from './index';
 
-export const database = new Pool({connectionString: config.postgresUrl});
+export const database = new Sequelize(config.postgresUrl, {
+  dialect: 'postgres',
+  logging: false,
+});
 
 async function ensureDatabaseExists(): Promise<void> {
   const adminUrl = new URL(config.postgresUrl);
@@ -25,7 +29,7 @@ async function ensureDatabaseExists(): Promise<void> {
 export async function connectDatabase(): Promise<void> {
   try {
     await ensureDatabaseExists();
-    await database.query('SELECT 1');
+    await database.authenticate();
     console.log('PostgreSQL connected');
   } catch (error) {
     console.error(

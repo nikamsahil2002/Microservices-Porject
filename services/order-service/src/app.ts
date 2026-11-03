@@ -1,6 +1,7 @@
 import express, {Express} from 'express';
 import cors from 'cors';
 import healthRouter from './routes/health';
+import orderRoutes from './routes/orders';
 import {AuthRequest, requireAuth} from './middleware/auth';
 import {notFoundHandler, errorHandler} from './middleware/errorHandler';
 
@@ -13,6 +14,7 @@ export function createApp(): Express {
   app.use(express.urlencoded({extended: true}));
 
   app.use('/health', healthRouter);
+  app.use('/api/orders', orderRoutes);
 
   app.get('/demo-protected', requireAuth, (req: AuthRequest, res) => {
     res.json({

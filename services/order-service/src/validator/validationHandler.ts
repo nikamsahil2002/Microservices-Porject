@@ -1,5 +1,5 @@
 import {NextFunction, Request, Response} from 'express';
-import {body, validationResult} from 'express-validator';
+import {body, param, query, validationResult} from 'express-validator';
 
 export const createOrderValidator = [
   body('userId')
@@ -30,6 +30,32 @@ export const createOrderValidator = [
     .isFloat({min: 0})
     .withMessage('Total amount must be a number greater than or equal to 0')
     .toFloat(),
+];
+
+export const getOrdersValidator = [
+  query('page')
+    .optional()
+    .isInt({min: 1})
+    .withMessage('Page must be a positive integer')
+    .toInt(),
+  query('limit')
+    .optional()
+    .isInt({min: 1, max: 100})
+    .withMessage('Limit must be an integer between 1 and 100')
+    .toInt(),
+];
+
+export const orderIdValidator = [
+  param('id').isUUID().withMessage('Order ID must be a valid UUID'),
+];
+
+export const updateOrderValidator = [
+  ...orderIdValidator,
+  ...createOrderValidator,
+  body('status')
+    .optional()
+    .isIn(['pending', 'paid', 'cancelled', 'fulfilled'])
+    .withMessage('Status must be pending, paid, cancelled, or fulfilled'),
 ];
 
 export function validationHandler(req: Request, res: Response, next: NextFunction): void {

@@ -51,6 +51,16 @@ The product service exposes CRUD endpoints under `/api/products`:
 
 Products can also include `description`, `stock`, and `active`.
 
+## Order API
+
+The order service exposes CRUD endpoints under `/api/orders`:
+
+- `POST /api/orders` creates an order. Required fields: `userId`, `productId`, `quantity`, and `totalAmount`.
+- `GET /api/orders?page=1&limit=10` lists orders with pagination. Page defaults to `1`, limit defaults to `10`, and the maximum limit is `100`.
+- `GET /api/orders/:id` retrieves an order by UUID.
+- `PUT /api/orders/:id` updates an order. It accepts the create fields and an optional `status` (`pending`, `paid`, `cancelled`, or `fulfilled`).
+- `DELETE /api/orders/:id` deletes an order.
+
 ## Notes
 
 This is the starting point for the assignment. Each phase will add the business logic and tests in sequence.

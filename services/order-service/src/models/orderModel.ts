@@ -1,3 +1,4 @@
+import {DataTypes, Model, Optional} from 'sequelize';
 import {database} from '../config/database';
 
 export type OrderStatus = 'pending' | 'paid' | 'cancelled' | 'fulfilled';
@@ -19,29 +20,115 @@ export interface CreateOrderInput {
   totalAmount: number;
 }
 
+export interface UpdateOrderInput extends CreateOrderInput {
+  status?: OrderStatus;
+}
+
+type OrderCreationAttributes = Optional<Order, 'id' | 'status' | 'createdAt'>;
+
+class OrderRecord extends Model<Order, OrderCreationAttributes> implements Order {
+  declare id: string;
+  declare userId: string;
+  declare productId: string;
+  declare quantity: number;
+  declare totalAmount: string;
+  declare status: OrderStatus;
+  declare createdAt: Date;
+}
+
+OrderRecord.init(
+  {
+    id: {type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4},
+    userId: {type: DataTypes.STRING(100), allowNull: false, field: 'user_id'},
+    productId: {type: DataTypes.STRING(100), allowNull: false, field: 'product_id'},
+    quantity: {type: DataTypes.INTEGER, allowNull: false, validate: {min: 1}},
+    totalAmount: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: false,
+      field: 'total_amount',
+      validate: {min: 0},
+    },
+    status: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'pending',
+      validate: {isIn: [['pending', 'paid', 'cancelled', 'fulfilled']]},
+    },
+    createdAt: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+      field: 'created_at',
+    },
+  },
+  {
+    sequelize: database,
+    tableName: 'orders',
+    timestamps: false,
+  },
+);
+
+function toOrder(record: OrderRecord): Order {
+  return {
+    id: record.id,
+    userId: record.userId,
+    productId: record.productId,
+    quantity: record.quantity,
+    totalAmount: record.totalAmount,
+    status: record.status,
+    createdAt: record.createdAt,
+  };
+}
+
 export async function initializeOrderModel(): Promise<void> {
-  await database.query(`
-    CREATE TABLE IF NOT EXISTS orders (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id VARCHAR(100) NOT NULL,
-      product_id VARCHAR(100) NOT NULL,
-      quantity INTEGER NOT NULL CHECK (quantity > 0),
-      total_amount NUMERIC(12, 2) NOT NULL CHECK (total_amount >= 0),
-      status VARCHAR(20) NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'paid', 'cancelled', 'fulfilled')),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
+  await OrderRecord.sync();
 }
 
 export async function createOrder(input: CreateOrderInput): Promise<Order> {
-  const result = await database.query<Order>(
-    `INSERT INTO orders (user_id, product_id, quantity, total_amount)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, user_id AS "userId", product_id AS "productId",
-       quantity, total_amount AS "totalAmount", status, created_at AS "createdAt"`,
-    [input.userId, input.productId, input.quantity, input.totalAmount],
-  );
+  return toOrder(await OrderRecord.create({...input, totalAmount: String(input.totalAmount)}));
+}
 
-  return result.rows[0];
+export async function getOrderById(id: string): Promise<Order | undefined> {
+  const record = await OrderRecord.findByPk(id);
+  return record ? toOrder(record) : undefined;
+}
+
+export async function getOrders(
+  page: number,
+  limit: number,
+): Promise<{orders: Order[]; total: number}> {
+  const result = await OrderRecord.findAndCountAll({
+    limit,
+    offset: (page - 1) * limit,
+    order: [['createdAt', 'DESC']],
+  });
+
+  return {
+    orders: result.rows.map(toOrder),
+    total: result.count,
+  };
+}
+
+export async function updateOrder(
+  id: string,
+  input: UpdateOrderInput,
+): Promise<Order | undefined> {
+  const record = await OrderRecord.findByPk(id);
+  if (!record) {
+    return undefined;
+  }
+
+  await record.update({...input, totalAmount: String(input.totalAmount)});
+  return toOrder(record);
+}
+
+export async function deleteOrder(id: string): Promise<Order | undefined> {
+  const record = await OrderRecord.findByPk(id);
+  if (!record) {
+    return undefined;
+  }
+
+  const order = toOrder(record);
+  await record.destroy();
+  return order;
 }
