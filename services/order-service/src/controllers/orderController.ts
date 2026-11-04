@@ -1,13 +1,12 @@
 import {Request, Response} from 'express';
 import {
-  CreateOrderInput,
-  createOrder,
   deleteOrder,
   getOrderById,
   getOrders,
   UpdateOrderInput,
   updateOrder,
 } from '../models/orderModel';
+import {createOrderWithValidation} from '../services/orderService';
 import {CustomError} from '../utils/customError';
 
 function getOrderId(req: Request): string {
@@ -19,7 +18,7 @@ function getOrderId(req: Request): string {
 }
 
 export async function createOrderController(req: Request, res: Response): Promise<void> {
-  const order = await createOrder(req.body as CreateOrderInput);
+  const order = await createOrderWithValidation(req.body);
   res.status(201).json({success: true, data: order});
 }
 

@@ -61,6 +61,14 @@ The order service exposes CRUD endpoints under `/api/orders`:
 - `PUT /api/orders/:id` updates an order. It accepts the create fields and an optional `status` (`pending`, `paid`, `cancelled`, or `fulfilled`).
 - `DELETE /api/orders/:id` deletes an order.
 
+Order creation uses gRPC to verify the user and product and check product stock before saving the order.
+
+## Internal gRPC
+
+The user service listens for gRPC on port `50051`; the product service listens on port `50052`. Order service uses these endpoints internally. Each service keeps its own proto contracts under its `proto` folder; order-service has local copies of the contracts it consumes. With Docker Compose, the service hosts are configured automatically. For local processes, set `USER_GRPC_HOST` and `PRODUCT_GRPC_HOST` in order-service if the defaults (`localhost:50051` and `localhost:50052`) do not apply.
+
+Both gRPC servers implement the standard gRPC health-check service (`grpc.health.v1.Health`) and report their service as `SERVING` after their database connection is established. Use a gRPC health-check client to call `Check` with service name `user.UserService` or `product.ProductService`.
+
 ## Notes
 
 This is the starting point for the assignment. Each phase will add the business logic and tests in sequence.

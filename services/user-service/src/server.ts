@@ -1,9 +1,11 @@
 import {config} from './config';
 import {createApp} from './app';
 import {connectDatabase} from './config/database';
+import {startUserGrpcServer} from './grpc/userGrpcServer';
 
 async function startServer(): Promise<void> {
   await connectDatabase();
+  await startUserGrpcServer();
 
   const app = createApp();
   app.listen(config.port, () => {
