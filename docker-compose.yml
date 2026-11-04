@@ -101,7 +101,7 @@ services:
       PORT: 3001
       USER_GRPC_PORT: 50051
       SERVICE_NAME: user-service
-      MONGO_URI: mongodb://mongo:27017/microservices-users
+      USER_MONGO_URI: mongodb://mongo:27017/microservices-users
       JWT_SECRET: ${JWT_SECRET:-dev-access-secret-change-me}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret-change-me}
       NODE_ENV: development
@@ -122,7 +122,7 @@ services:
       PORT: 3002
       PRODUCT_GRPC_PORT: 50052
       SERVICE_NAME: product-service
-      MONGO_URI: mongodb://mongo:27017/microservices-product
+      PRODUCT_MONGO_URI: mongodb://mongo:27017/microservices-product
       REDIS_URL: redis://redis:6379
       NODE_ENV: development
     depends_on:
