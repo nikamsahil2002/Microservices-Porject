@@ -1,23 +1,76 @@
 import {NextFunction, Request, Response} from 'express';
 
-export interface AuthRequest extends Request {
-  user?: {
-    token: string;
-    authenticated: boolean;
-  };
+interface AuthenticatedUser {
+  id: string;
+  email: string;
+  name: string;
 }
 
-export function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
+export interface AuthRequest extends Request {
+  user?: AuthenticatedUser;
+}
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({message: 'Unauthorized'});
+const gatewayAuthUrl =
+  process.env.GATEWAY_AUTH_URL ?? 'http://localhost:8080/internal/auth/verify';
+
+function isAuthenticatedUser(value: unknown): value is AuthenticatedUser {
+  if (typeof value !== 'object' || value === null) {
+    return false;
   }
 
-  req.user = {
-    token: authHeader.replace('Bearer ', ''),
-    authenticated: true,
-  };
+  const user = value as Record<string, unknown>;
+  return (
+    typeof user.id === 'string' &&
+    typeof user.email === 'string' &&
+    typeof user.name === 'string'
+  );
+}
 
-  return next();
+export async function requireAuth(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const authorization = req.get('authorization');
+  if (!authorization?.startsWith('Bearer ') || !authorization.slice('Bearer '.length).trim()) {
+    res.status(401).json({success: false, message: 'Unauthorized'});
+    return;
+  }
+
+  try {
+    const authResponse = await fetch(gatewayAuthUrl, {
+      method: 'POST',
+      headers: {authorization},
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (authResponse.status === 401) {
+      res.status(401).json({success: false, message: 'Invalid or expired token'});
+      return;
+    }
+
+    if (!authResponse.ok) {
+      console.error(`Gateway auth returned HTTP ${authResponse.status}`);
+      res.status(503).json({success: false, message: 'Authentication service unavailable'});
+      return;
+    }
+
+    const result: unknown = await authResponse.json();
+    if (
+      typeof result !== 'object' ||
+      result === null ||
+      !('user' in result) ||
+      !isAuthenticatedUser(result.user)
+    ) {
+      console.error('Gateway auth returned an invalid user response');
+      res.status(502).json({success: false, message: 'Invalid authentication service response'});
+      return;
+    }
+
+    req.user = result.user;
+    next();
+  } catch (error) {
+    console.error('Gateway auth request failed:', error);
+    res.status(503).json({success: false, message: 'Authentication service unavailable'});
+  }
 }

@@ -12,10 +12,8 @@ npm run dev
 Then access:
 
 - Gateway: http://localhost:8080/health
-- User service: http://localhost:3001/health
-- Product service: http://localhost:3002/health
-- Order service: http://localhost:3003/health
-- Notification service: http://localhost:3004/health
+
+Application APIs are accessed through the gateway; service ports are not published to the host.
 
 ## Phase 1 status
 
@@ -38,6 +36,8 @@ Each service connects to its own database before listening for requests. MongoDB
 ## User authentication
 
 The user service hashes passwords with bcrypt and returns a 15-minute access token plus a 7-day refresh token from registration and login. Send the access token as `Authorization: Bearer <accessToken>`. Refresh tokens are stored as hashes in MongoDB and rotated by `POST /api/users/refresh` with `{ "refreshToken": "..." }`. `POST /api/users/logout` revokes the submitted refresh token. Set distinct `JWT_SECRET` and `JWT_REFRESH_SECRET` values outside development.
+
+The API gateway is the public HTTP entry point on port `8080` and forwards requests for `/api/users`, `/api/products`, `/api/orders`, and `/api/notifications` to their services. For protected routes, each service sends the incoming bearer token to the gateway's `POST /internal/auth/verify` endpoint before handling the request. The gateway verifies the token and returns the user claims; the service proceeds only if verification succeeds and fails closed if the gateway is unavailable. This also lets a service validate tokens centrally when called directly. Docker Compose keeps service HTTP and gRPC ports internal so clients access APIs through the gateway, and configures `GATEWAY_AUTH_URL` for each service. The gateway and user service must use the same `JWT_SECRET`; Docker Compose configures both from that variable. When running services outside Docker, the gateway accepts `USER_SERVICE_URL`, `PRODUCT_SERVICE_URL`, and `ORDER_SERVICE_URL` to configure the upstream addresses.
 
 ## Product API
 

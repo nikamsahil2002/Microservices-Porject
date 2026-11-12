@@ -14,7 +14,7 @@ export function createApp(): Express {
   app.use(express.urlencoded({extended: true}));
 
   app.use('/health', healthRouter);
-  app.use('/api/orders', orderRoutes);
+  app.use('/api/orders', requireAuth, orderRoutes);
 
   app.get('/demo-protected', requireAuth, (req: AuthRequest, res) => {
     res.json({

@@ -4,8 +4,6 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
-  iat?: number;
-  exp?: number;
 }
 
 export interface AuthRequest extends Request {

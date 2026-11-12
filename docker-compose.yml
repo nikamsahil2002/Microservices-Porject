@@ -77,6 +77,11 @@ services:
     environment:
       PORT: 8080
       SERVICE_NAME: gateway
+      JWT_SECRET: ${JWT_SECRET:-dev-access-secret-change-me}
+      USER_SERVICE_URL: http://user-service:3001
+      PRODUCT_SERVICE_URL: http://product-service:3002
+      ORDER_SERVICE_URL: http://order-service:3003
+      NOTIFICATION_SERVICE_URL: http://notification-service:3004
       NODE_ENV: development
     depends_on:
       user-service:
@@ -94,14 +99,12 @@ services:
       dockerfile: services/user-service/Dockerfile
     container_name: ecommerce-user-service
     restart: unless-stopped
-    ports:
-      - "3001:3001"
-      - "50051:50051"
     environment:
       PORT: 3001
       USER_GRPC_PORT: 50051
       SERVICE_NAME: user-service
       USER_MONGO_URI: mongodb://mongo:27017/microservices-users
+      GATEWAY_AUTH_URL: http://gateway:8080/internal/auth/verify
       JWT_SECRET: ${JWT_SECRET:-dev-access-secret-change-me}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret-change-me}
       NODE_ENV: development
@@ -115,14 +118,12 @@ services:
       dockerfile: services/product-service/Dockerfile
     container_name: ecommerce-product-service
     restart: unless-stopped
-    ports:
-      - "3002:3002"
-      - "50052:50052"
     environment:
       PORT: 3002
       PRODUCT_GRPC_PORT: 50052
       SERVICE_NAME: product-service
       PRODUCT_MONGO_URI: mongodb://mongo:27017/microservices-product
+      GATEWAY_AUTH_URL: http://gateway:8080/internal/auth/verify
       REDIS_URL: redis://redis:6379
       NODE_ENV: development
     depends_on:
@@ -137,8 +138,6 @@ services:
       dockerfile: services/order-service/Dockerfile
     container_name: ecommerce-order-service
     restart: unless-stopped
-    ports:
-      - "3003:3003"
     environment:
       PORT: 3003
       SERVICE_NAME: order-service
@@ -146,6 +145,7 @@ services:
       DB_PASSWORD: 1234
       DB_DATABASE: green-dose-local
       DB_HOST: orders
+      GATEWAY_AUTH_URL: http://gateway:8080/internal/auth/verify
       DB_PORT: 5432
       USER_GRPC_HOST: user-service:50051
       PRODUCT_GRPC_HOST: product-service:50052
@@ -166,8 +166,6 @@ services:
       context: ./services/notification-service
     container_name: ecommerce-notification-service
     restart: unless-stopped
-    ports:
-      - "3004:3004"
     environment:
       PORT: 3004
       SERVICE_NAME: notification-service
@@ -175,6 +173,7 @@ services:
       DB_PASSWORD: 1234
       DB_DATABASE: microservices-notifications
       DB_HOST: orders
+      GATEWAY_AUTH_URL: http://gateway:8080/internal/auth/verify
       DB_PORT: 5432
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
       NODE_ENV: development
